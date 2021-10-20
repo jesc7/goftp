@@ -147,8 +147,11 @@ func (c *Client) ReadDir(path string) ([]os.FileInfo, error) {
 	for _, entry := range entries {
 		info, err := parser(entry, true)
 		if err != nil {
-			c.debug("error in ReadDir: %s", err)
-			return nil, err
+			info, err = parseDirListLine(entry, c.config.ServerLocation, true)
+			if err != nil {
+				c.debug("error in ReadDir: %s", err)
+				return nil, err
+			}
 		}
 
 		if info == nil {
@@ -487,6 +490,63 @@ func parseMLST(entry string, skipSelfParent bool) (os.FileInfo, error) {
 	info := &ftpFile{
 		name:  filepath.Base(parts[1]),
 		size:  size,
+		mtime: mtime,
+		raw:   entry,
+		mode:  mode,
+	}
+
+	return info, nil
+}
+
+// parseDirListLine parses a directory line in a format based on the output of
+// the MS-DOS DIR command.
+func parseDirListLine(entry string, loc *time.Location, skipSelfParent bool) (os.FileInfo, error) {
+	var (
+		dirTimeFormats = []string{
+			"01-02-06  03:04PM",
+			"2006-01-02  15:04",
+		}
+		mode  os.FileMode
+		mtime time.Time
+		size  uint64
+		e     error
+	)
+
+	line := entry
+	// Try various time formats that DIR might use, and stop when one works.
+	for _, format := range dirTimeFormats {
+		if len(line) > len(format) {
+			mtime, e = time.ParseInLocation(format, line[:len(format)], loc)
+			if e == nil {
+				line = line[len(format):]
+				break
+			}
+		}
+	}
+	if e != nil {
+		// None of the time formats worked.
+		return nil, ftpError{err: fmt.Errorf(`failed parsing DirListLine entry's mtime: %s (%s)`, e, line)}
+	}
+
+	line = strings.TrimLeft(line, " ")
+	if strings.HasPrefix(line, "<DIR>") {
+		mode |= os.ModeDir
+		line = strings.TrimPrefix(line, "<DIR>")
+	} else {
+		space := strings.Index(line, " ")
+		if space == -1 {
+			return nil, ftpError{err: fmt.Errorf(`failed parsing DirListLine entry's size: %s`, line)}
+		}
+		size, e = strconv.ParseUint(line[:space], 10, 64)
+		if e != nil {
+			return nil, ftpError{err: fmt.Errorf(`failed parsing DirListLine entry's size: %s (%s)`, e, line)}
+		}
+		line = line[space:]
+	}
+
+	info := &ftpFile{
+		name:  strings.TrimLeft(line, " "),
+		size:  int64(size),
 		mtime: mtime,
 		raw:   entry,
 		mode:  mode,
