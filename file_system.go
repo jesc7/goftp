@@ -86,6 +86,10 @@ func (c *Client) Rmdir(path string) error {
 	return pconn.sendCommandExpected(replyFileActionOkay, "RMD %s", path)
 }
 
+func (c *Client) GetMaxConn() int {
+	return c.config.ConnectionsPerHost
+}
+
 // Getwd returns the current working directory.
 func (c *Client) Getwd() (string, error) {
 	pconn, err := c.getIdleConn()
