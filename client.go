@@ -168,6 +168,7 @@ type Client struct {
 	mu              sync.Mutex
 	t0              time.Time
 	closed          bool
+	CanResume       bool
 }
 
 // Construct and return a new client Conn, setting default config
@@ -205,6 +206,7 @@ func newClient(config Config, hosts []string) *Client {
 		hosts:           hosts,
 		allCons:         make(map[int]*persistentConn),
 		numConnsPerHost: make(map[string]int),
+		CanResume:       true,
 	}
 }
 

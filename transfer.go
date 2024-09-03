@@ -259,6 +259,10 @@ func (c *Client) size(path string) (int64, error) {
 }
 
 func (c *Client) canResume() bool {
+	if !c.CanResume {
+		return false
+	}
+
 	pconn, err := c.getIdleConn()
 	if err != nil {
 		return false
