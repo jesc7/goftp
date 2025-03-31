@@ -259,7 +259,7 @@ func (c *Client) size(path string) (int64, error) {
 }
 
 func (c *Client) canResume() bool {
-	if !c.CanResume {
+	if c.DontResume {
 		return false
 	}
 
